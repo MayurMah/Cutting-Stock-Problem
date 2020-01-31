@@ -1,0 +1,277 @@
+model CuttingStockColGen	! Name the model
+
+uses "mmxprs"	! include the Xpress solver package
+
+! knapsack function solves the knapsack problem. You will need to write the content of the function in the later part of the code
+! here is the initial declaration of the function
+forward function knapsack(y: array(range) of real, W: integer, w: array(range) of integer) : real
+
+m := 8                                               ! the number of different small rolls 
+
+declarations										   ! declare sets, arrays, constraints, and variables
+	
+	dRange = 1 .. m                                    ! the index range of demand
+	pRange : range                                     ! the index range of patterns
+	W : integer										   ! width of the large roll
+	w : array(dRange) of integer                       ! widths of the small rolls
+	b : array(dRange) of integer                  	   ! demands of the small rolls
+		
+	initialPatterns: array(dRange, pRange) of real  ! set of initial patterns to start the column generation
+	newPattern: array(dRange) of real                  ! the newly generated pattern by the knapsack problem
+	numPatterns: integer                               ! number of patterns in the restricted master problem
+	Z : real 			                               ! knapsack objective value
+	dualVar : array(dRange) of real                    ! dual variables for the demand constraints
+	DemandConstr: array(dRange) of linctr              ! Demand constraints
+	numRolls : linctr	                               ! objective value of cutting stock restricted master problem		
+	
+	x : dynamic array(pRange) of mpvar                 ! decision variable: number of rolls cut in each pattern
+	waste: dynamic array(pRange) of real				!wasted stuff
+	
+end-declarations									   ! end declarations section
+
+
+! initialization from data file
+! test on different data files cs1.dat, cs2.dat, cs3.dat, and report results for each instance
+!!!!!!!!!!!!!!!!!! write your code here !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+initializations from 'cs1.dat'
+	W w b
+end-initializations
+
+
+
+! Column generation needs to start from a subset of initial columns ir patterns
+! As discussed in class, you can easily find a subset of m initial patterns which generates a basic feasible solution
+! Choose the subset of initial patterns and save them in the array initialPatterns
+!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+forall(i in dRange) do
+	initialPatterns(i,i) := 1
+	waste(i) := W - w(i)
+end-do
+
+! set the number of initial patterns  
+! this number will need to be updated everytime a new pattern is generated
+numPatterns := m	
+
+! create the corresponding x variables and set the nonnegativity constraints
+!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+forall(i in 1..numPatterns) do
+	create(x(i))
+	x(i) >=0
+end-do
+
+
+! Create demand constraints using the initialPatterns and the variables x created above. 
+! These constraints need to be named DemandConstr(i) because we'll need to get their shadow prices (i.e. dual variables) later, 
+! and for us to be able to ask Xpress for shadow prices we need a way to refer to the constraints.
+!!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+forall(i in dRange) do
+	DemandConstr(i):= sum(j in 1..numPatterns) x(j) * initialPatterns(i,j) = b(i)
+end-do
+		
+		
+		
+		
+		
+! Create objective function. The objective needs to be named numRolls
+! Just like the demand constraints, we'll need to add variables to it as they get generated.
+!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+numRolls:= sum(i in 1..numPatterns) x(i)
+
+
+!!!!!!!!!!!! Begin column generation !!!!!!!!!!!!!!!!!!
+repeat	
+	
+	! Solve the problem using the variables that have been generated so far
+	! Notice: you may need to use the XPRS_LIN parameter in the minimize command
+	minimize(XPRS_LIN, numRolls)
+	
+	
+
+
+	
+	! Print the objective value and the solution x
+	writeln("Number of Large Rolls = ", getobjval)
+	forall(j in 1..numPatterns) do
+		if (getsol(x(j)) > 0) then
+			writeln("Pattern ",j," = ",getsol(x(j)))
+		!	forall(i in dRange)
+		!		writeln(initialPatterns(i,j))
+		end-if
+	end-do
+	
+		
+	! Get the dual varialbes (shadow prices) 
+	! Hint: Check out command "getdual" in the solution manual
+	!!!!!!!!!!!!!! write your code here !!!!!!!!!!!!!!!!!!
+
+
+	forall(i in dRange) do
+		dualVar(i) := getdual(DemandConstr(i))
+	end-do
+
+
+
+	
+	! Call the knapsack function, set Z to be the knapsack objective value
+	! for example: Z=knapsack(y,W,z), but you need to figure out what y is.
+	!!!!!!!!!!!!!! write your code here !!!!!!!!!!!!!!!!!!
+
+	Z := knapsack(dualVar, W, w)
+
+	
+
+	
+
+	! If the reduced cost is less than zero (here we use -0.000001 to approximate 0 in order to avoid numerical error)
+	if 1 - Z <= -0.0000001 then
+		
+		! Print out the new pattern found by knapsack problem
+		!!!!!!!!!!!!!!! write your code here !!!!!!!!!!!!!!!!!!!
+		writeln("\n===============\n")
+		writeln("Adding Pattern ",newPattern,") : reduced cost is ",Z)
+		waste(numPatterns) := W - sum(i in dRange) newPattern(i) * w(i)
+		
+		
+		
+		
+		
+		
+		!	update the number of patterns generated
+		! 	create the new variable
+		!	update the constraints for each demand by adding the new pattern generated by knapsack
+		!	update the objective function by adding the new pattern
+		!!!!!!!!!!!!!!! write your code here  !!!!!!!!!!!!!!
+		
+		numPatterns += 1
+		
+		create(x(numPatterns))
+		x(numPatterns) >= 0	
+		
+		
+		forall(i in dRange) do
+			DemandConstr(i) += x(numPatterns) * newPattern(i)
+			initialPatterns(i, numPatterns) := newPattern(i)
+		end-do
+		
+		numRolls += x(numPatterns)
+		
+	end-if
+	minimize(numRolls)
+until 1 - Z >= -0.000001	! continue until no variable has a good reduced cost
+!!!!!!!!!!!! End column generation !!!!!!!!!!!!!!!!!!
+
+writeln("\n=======Optimal Solution========\n")
+! Print a summary of the final LP solution: selected patterns, number of rolls cut using each selected pattern, total number of rolls
+!!!!!!!!!!! wrtie your code here !!!!!!!!!!!!!!!!!!
+writeln("Number of Large Rolls = ", getobjval)
+forall(j in 1..numPatterns) do
+	if (getsol(x(j)) > 0) then
+		writeln("Pattern ",j," = ",getsol(x(j)))
+		!forall(i in dRange)
+		!	writeln(initialPatterns(i,j))
+	end-if
+end-do
+writeln("Waste = ", sum(j in 1..numPatterns) getsol(x(j)) * waste(j))
+! We also want to get integer solutions. There are at least two approaches to do this. 
+! The first approach is to round up the LP solution.
+! The second approach is to re-solve the master problem as an integer program using all the generated patterns 
+
+
+! Implement the first approach: rounding the LP solution and print out a summary ofthe solution: number of rolls cut using each selected pattern, total number of rolls
+!!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!!!!!!!
+
+writeln("\n=======Optimal Solution - Rounded Up========\n")
+
+forall(j in 1..numPatterns) do
+	if (getsol(x(j)) > 0) then
+		writeln("Pattern ",j," = ",ceil(getsol(x(j))))
+		!forall(i in dRange)
+		!	writeln(initialPatterns(i,j))
+	end-if
+end-do
+writeln("Number of Large Rolls = ", sum(j in 1..numPatterns) ceil(getsol(x(j))))
+writeln("Waste = ", sum(j in 1..numPatterns) ceil(getsol(x(j))) * waste(j))
+
+
+
+! Implement the second approach: first, constrain all variables to be integer (example: x(j) is_integer), then solve the master problem using all generated patterns
+! You also need to print out a summary of the solution: number of rolls cut using each selected pattern, total number of rolls
+!!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!!!!!!!
+
+writeln("\n=======Optimal Solution - Master Problem========\n")
+forall(j in 1..numPatterns) do
+	x(j) is_integer
+end-do
+minimize(numRolls)
+
+writeln("Number of Large Rolls = ", getobjval)	
+forall(j in 1..numPatterns) do
+	if (getsol(x(j)) > 0) then
+		writeln("Pattern ",j," = ",getsol(x(j)))
+		!forall(i in dRange)
+		!	writeln(initialPatterns(i,j))
+	end-if
+end-do
+writeln("Waste = ", sum(j in 1..numPatterns) getsol(x(j)) * waste(j))
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!! Knapsack Problem !!!!!!!!!!!!!!!!!!!!!!
+!! implement a function that solves the knapsack problem   !!
+!! Inputs: objective coefficient array y                   !!   
+!!         width of the large roll W                       !!
+!!         widths of the small rolls array w               !!
+!! Return: optimal objective function value                !!  
+!!         optimal solution (i.e. the new pattern)         !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+function knapsack(y: array(range) of real, W: integer, w: array(range) of integer) : real
+
+	! declare decision variable
+	! form constraints and objective
+	! do not forget the integrality constraints on the variables
+	! solve the problem
+	!!!!!!!!!!!! write your code here !!!!!!!!!!!!!!!
+	
+	declarations
+		a: array(1..m) of mpvar
+	end-declarations
+
+	forall(i in 1..m) do
+		a(i) is_integer
+	end-do
+	
+	Objective:= sum(i in 1..m) y(i) * a(i)
+	W >= sum(i in 1..m) a(i) * w(i)
+	
+	maximize(Objective)
+	
+	! return the optimal objective value
+	! the keyword returned is reserved for this purpose by Xpress
+	returned := getobjval
+	
+	
+	! return the optimal solution, save it in the array newPattern defined in the beginning of this model file
+	!!!!!!!!!!!! write your code here !!!!!!!!!!!!!!!
+	forall(i in 1..m) do
+		newPattern(i) := getsol(a(i))
+	end-do
+	
+	
+	
+	
+end-function
+
+
+
+
+
+end-model

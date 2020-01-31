@@ -1,0 +1,77 @@
+model Kantorovich
+uses "mmxprs"; !gain access to the Xpress-Optimizer solver
+
+declarations
+	W : integer       	 				! the width of the large rolls
+	m = 8		                        ! the number of different small rolls demanded
+	K = 600                             ! number of available large rolls
+	kRange = 1 .. K       			    ! the index of large rolls
+	iRange = 1 .. m      		 		! the index of small rolls
+	w : array(iRange) of integer 		! widths of the small rolls
+	b : array(iRange) of integer 		! demand of the small rolls
+	y : array(kRange) of mpvar 			! y(k)=1 if roll k is cut, 0 ow
+	x : array(kRange, iRange) of mpvar  ! x(k,i) number of times an item of width wi is cut on roll k
+end-declarations
+
+initializations from 'cs1.dat'
+	W w b
+end-initializations
+
+
+
+! objective function 
+!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!
+	 
+Objective := sum(k in kRange) y(k)
+
+
+! constraints-1
+!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!
+forall(i in iRange)
+	b(i) = sum(k in kRange) x(k,i)
+
+
+	
+! constraints-2	
+!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!	
+
+forall(k in kRange)
+	y(k) * W >= sum(i in iRange) (x(k,i) * w(i))
+
+
+
+! bounds on variables and integrality constraints 
+! note how to constrain a variable to be integral. you will need to use it in the part 2 of this problem.
+forall (k in kRange, i in iRange) do
+	x(k,i)>=0
+	y(k)>=0
+	y(k)<=1
+!	y(k) is_integer
+	x(k,i) is_integer
+end-do
+
+! solve the problem
+!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!
+
+minimize (Objective)
+
+
+! print out the objective value and the nonzero optimal variables
+writeln("obj=",getobjval)
+forall (k in kRange) do
+	if (getsol(y(k))>0) then
+		writeln("y(",k,")=", getsol(y(k)))
+		forall (i in iRange) do
+			if (getsol(x(k,i))>0) then
+				writeln("x(",k,",",i,")=",getsol(x(k,i)))
+			end-if	
+		end-do	
+		writeln("----")
+	end-if
+		
+	
+	
+end-do
+
+	
+end-model
