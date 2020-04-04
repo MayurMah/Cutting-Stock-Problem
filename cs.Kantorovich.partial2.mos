@@ -18,30 +18,27 @@ initializations from 'cs1.dat'
 end-initializations
 
 
-
-! objective function 
-!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!
+! objective function
 	 
 Objective := sum(k in kRange) y(k)
 
 
 ! constraints-1
-!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!
+
 forall(i in iRange)
 	b(i) = sum(k in kRange) x(k,i)
 
 
 	
-! constraints-2	
-!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!!	
+! constraints-2
 
 forall(k in kRange)
 	y(k) * W >= sum(i in iRange) (x(k,i) * w(i))
 
 
 
-! bounds on variables and integrality constraints 
-! note how to constrain a variable to be integral. you will need to use it in the part 2 of this problem.
+! bounds on variables and integrality constraints
+
 forall (k in kRange, i in iRange) do
 	x(k,i)>=0
 	y(k)>=0
@@ -51,12 +48,12 @@ forall (k in kRange, i in iRange) do
 end-do
 
 ! solve the problem
-!!!!!!!!!!!!!!!!!! Write your code here !!!!!!!!!!!!!!!!!!
 
 minimize (Objective)
 
 
 ! print out the objective value and the nonzero optimal variables
+
 writeln("obj=",getobjval)
 forall (k in kRange) do
 	if (getsol(y(k))>0) then
@@ -73,5 +70,4 @@ forall (k in kRange) do
 	
 end-do
 
-	
 end-model
